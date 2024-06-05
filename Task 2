@@ -1,0 +1,51 @@
+create view app_events_view as (              -- прибрав дублікати та створив view для подальшої роботи
+ with dubl_tabl as(
+ select user_id
+		, event_type 
+		, event_time
+		, row_number () over(partition by user_id, event_type, event_time) as dubl
+  from 	app_events ae
+  )
+ 
+  select  user_id
+		, event_type 
+		, event_time
+  from dubl_tabl
+  where dubl = 1
+  )
+
+with cte as (
+select 	aev.user_id 
+		, aev.event_type 
+		, aev.event_time
+from app_events_view aev
+ union
+ select p.user_id 
+		, p.event_type 
+		, p.event_time
+from	payments p
+)                              -- об'єднав таблиці 
+
+select	 
+		to_char(event_time, 'YYYY-MM') as event_date
+		, count(distinct cte.user_id) as uniq_user                                                         -- кількість унікальних юзерів
+ 		, count(distinct cte.user_id) filter (where event_type='onboarding') as num_onboard_user           -- кількість унікальних юзерів, які пройшли обординг
+ 		, count(distinct cte.user_id) filter (where event_type='scan') as num_scan_user                    -- кількість ункіальних юзерів, які скористались автоматичним скануванням
+ 		, count(distinct cte.user_id) filter (where event_type='adjustment') as num_set_user               -- кількість унікальних юзерів, які скористались ручним налаштуванням
+ 		, count(distinct cte.user_id) filter (where event_type='took_trial') as num_trial_user             -- кількість унікальних юзерів, які скористались тріал періодом
+ 		, count(distinct cte.user_id) filter (where event_type='payment') as num_pay_user                  -- кількість унікальних юзерів, які скористались скористалися підпискою
+ 		, count(distinct cte.user_id) filter (where event_type='cancelled_subscription') as num_canc_user  -- кількість унікальних юзерів, які скористались відмінили
+ 		, count(event_type) filter (where event_type='payment') num_transact                               -- загальна кількість транзакцій
+ 		, count(event_type) filter (where event_type='payment')*7 as month_profit                          -- щомісячний дохід
+   		, sum(count(event_type) filter (where event_type='payment')*7) over() as all_profit              -- загальний дохід за весь період від користувачів
+   		, count(distinct case when date_trunc('month', cte.event_time::date) = date_trunc('month', join_cte.first_pay::date) then cte.user_id end) as new_paid_user    -- кількість нових унікальних юзерів, які стали платити у відповідний місяць
+   		, count( case when date_trunc('month', cte.event_time::date) = date_trunc('month', join_cte.first_pay::date) and event_type = 'payment' then event_type end) as num_trans_new_user  -- кількість транзакцій від нових унікальних узерів
+   		, count(case when date_trunc('month', cte.event_time::date) = date_trunc('month', join_cte.first_pay::date) and event_type = 'payment' then event_type end)*7 as new_mrr   -- дохід згенерований від ноих узерів
+ from	cte
+ left	join (select
+  		              user_id
+  		              , min(to_char(event_time, 'YYYY-MM-DD')) filter (where event_type = 'payment') as first_pay
+  		        from  cte
+  		       group  by 1) as join_cte on cte.user_id = join_cte.user_id                   -- зробив join для розрахунку деяких показників
+ group	by 1
+ order 	by 1
