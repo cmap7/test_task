@@ -1,0 +1,44 @@
+create view info as (
+ with cte as (
+select 	aev.user_id 
+		, aev.event_type 
+		, aev.event_time
+from app_events_view aev
+ union
+ select p.user_id 
+		, p.event_type 
+		, p.event_time
+from	payments p
+)
+
+select	cte.user_id
+		, cte.event_type as pay
+		, hand.event_type as sett
+		, auto.event_type as scan
+from	cte
+left	join (select	distinct user_id
+						, event_type
+				from	cte
+			   where	event_type = 'adjustment') hand
+			   on hand.user_id = cte.user_id
+left	join (select	distinct user_id
+						, event_type
+				from	cte
+			   where	event_type = 'scan') auto
+			   on auto.user_id = cte.user_id
+where 	cte.event_type = 'payment'
+ )
+ 
+select 	count(distinct user_id) as unique_users
+		, count(pay) as total_payments
+		, count(distinct user_id) filter (where scan is not null and sett is null) as users_with_scan
+		, count(pay) filter (where scan is not null and sett is null) as payments_with_scan
+		, count(pay) filter (where scan is not null and sett is null)*7 as profit_scan
+		, count(distinct user_id) filter (where sett is not null) as users_with_sett
+		, count(pay) filter (where sett is not null) as payments_with_sett
+		, count(pay) filter (where sett is not null)*7 as profit_sett
+		, count(distinct user_id) filter (where scan is null and sett is null) as users_with_no_scan_or_sett
+		, count(pay) filter (where scan is null and sett is null) as payments_with_no_scan_or_sett
+		, count(pay) filter (where scan is null and sett is null)*7 as profit_another
+ from 	info 
+ 
