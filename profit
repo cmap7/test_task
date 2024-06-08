@@ -11,6 +11,8 @@ select 	aev.user_id
 from	payments p
 )
 
+-- Отримав таблицю з транзакціями юзерів та використаним функціоналом
+
 select	cte.user_id
 	, cte.event_type as pay
 	, hand.event_type as sett
@@ -19,26 +21,28 @@ from	cte
 left	join (select	distinct user_id
 			, event_type
 		from	cte
-		where	event_type = 'adjustment') hand
+		where	event_type = 'adjustment') hand          -- юзери, які скористались ручним налаштуванням
 			   on hand.user_id = cte.user_id
- left	join (select	distinct user_id
+left	join (select	distinct user_id
 			, event_type
 		from	cte
-		where	event_type = 'scan') auto
+		where	event_type = 'scan') auto                -- юзери, які скористались автоматичним скануванням
 			   on auto.user_id = cte.user_id
- where 	cte.event_type = 'payment'
+where 	cte.event_type = 'payment'
  )
  
-select 		count(distinct user_id) as unique_users
-		, count(pay) as total_payments
-		, count(distinct user_id) filter (where scan is not null and sett is null) as users_with_scan
-		, count(pay) filter (where scan is not null and sett is null) as payments_with_scan
-		, count(pay) filter (where scan is not null and sett is null)*7 as profit_scan
-		, count(distinct user_id) filter (where sett is not null) as users_with_sett
-		, count(pay) filter (where sett is not null) as payments_with_sett
-		, count(pay) filter (where sett is not null)*7 as profit_sett
-		, count(distinct user_id) filter (where scan is null and sett is null) as users_with_no_scan_or_sett
-		, count(pay) filter (where scan is null and sett is null) as payments_with_no_scan_or_sett
-		, count(pay) filter (where scan is null and sett is null)*7 as profit_another
- from 	info 
- 
+select 		count(distinct user_id) as unique_users                                                         -- загальна кількість юезрів, які оформили підпииску
+		, count(pay) as total_payments                                                                  -- загальна кількість транзакцій
+		, count(distinct user_id) filter (where scan is not null and sett is null) as users_with_scan   	-- кількість юзерів, які скористались лише автоматичним скануванням
+		, count(pay) filter (where scan is not null and sett is null) as payments_with_scan             	-- кількість транзакцій цих юзерів
+		, count(pay) filter (where scan is not null and sett is null)*7 as profit_scan                  	-- дохід компанії від них
+		, count(distinct user_id) filter (where sett is not null and scan is null) as users_with_sett   		-- кількість юзерів, які скористались лише ручним налаштуванням
+		, count(pay) filter (where sett is not null and scan is null) as payments_with_sett             		-- кількість транзакцій цих юзерів
+		, count(pay) filter (where sett is not null and scan is null)*7 as profit_sett                  		-- дохід компанії від них
+		, count(distinct user_id) filter (where sett is not null) as users_with_two_func                			-- кількість юзерів, які скористались двома функціями
+		, count(pay) filter (where sett is not null) as payments_with_two_func                          			-- кількість транзакцій цих юзерів                   
+		, count(pay) filter (where sett is not null)*7 as profit_two_func                               			-- дохід компанії від них
+		, count(distinct user_id) filter (where scan is null and sett is null) as users_with_no_scan_or_sett   -- кількість юзерів, які не скористались жодним функцціоналом
+		, count(pay) filter (where scan is null and sett is null) as payments_with_no_scan_or_sett             -- кількість транзакцій цих юзерів 
+		, count(pay) filter (where scan is null and sett is null)*7 as profit_another                          -- дохід компанії від них
+ from 		info 
